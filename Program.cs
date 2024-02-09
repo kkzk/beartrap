@@ -30,8 +30,7 @@ namespace beartrap {
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            //Application.Run(new Form1());
-            ResidentIcon rm = new ResidentIcon();
+            Form1 form = new Form1();
             Application.Run();
         }
 
@@ -90,29 +89,4 @@ namespace beartrap {
             }
         }
     }
-
-    class ResidentIcon : Form {
-        public ResidentIcon() {
-            this.ShowInTaskbar = false;
-            this.setComponents();
-        }
-
-        private void Close_Click(object sender, EventArgs e) {
-            Application.Exit();
-        }
-
-        private void setComponents() {
-            NotifyIcon icon = new NotifyIcon();
-            icon.Icon = new Icon("beartrap.ico");
-            icon.Visible = true;
-            icon.Text = "beartrap";
-            ContextMenuStrip menu = new ContextMenuStrip();
-            ToolStripMenuItem menuItem = new ToolStripMenuItem();
-            menuItem.Text = "&終了";
-            menuItem.Click += new EventHandler(Close_Click);
-            menu.Items.Add(menuItem);
-            icon.ContextMenuStrip = menu;
-        }
-    }
-
 }
