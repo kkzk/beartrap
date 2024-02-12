@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Forms;
 using System.Diagnostics;
 using System.Text;
+using System.IO;
 
 
 namespace beartrap {
@@ -31,7 +32,7 @@ namespace beartrap {
             Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent,
                 rootElement,
                 TreeScope.Descendants,
-                HandleOpenEvent);
+                new AutomationEventHandler(HandleOpenEvent));
 
             EventLog.WriteEntry(EVENTLEG_SOURCE, "イベントハンドラを設定しました", EventLogEntryType.Information, 100);
 
@@ -46,7 +47,8 @@ namespace beartrap {
             int screenIndex = 0; // 0はメインディスプレイ
 
             // スクリーンショットを取得して保存するパス
-            string fileName = "C:\\temp\\screenshot_" + DateTime.Now.ToString("yyyy-MM-dd_HHmmss") + ".png";
+            string pictureFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            string fileName = Path.Combine(pictureFolder, "screenshot_" + DateTime.Now.ToString("yyyy-MM-dd_HHmmss") + ".png");
 
             // スクリーンショットを取得して保存
             Screen screen = Screen.AllScreens[screenIndex];
@@ -60,13 +62,13 @@ namespace beartrap {
             }
 
             EventLog.WriteEntry(EVENTLEG_SOURCE,
-                $"スクリーンショットが保存されました:{fileName}",
+                $"スクリーンショットを保存しました:{fileName}",
                 EventLogEntryType.Information, 111);
         }
 
         // UI Automation Invokeイベントハンドラ
         private static void HandleInvokeEvent(object sender, AutomationEventArgs e) {
-            EventLog.WriteEntry(EVENTLEG_SOURCE, "ボタンが押されました", EventLogEntryType.Information, 110);
+            EventLog.WriteEntry(EVENTLEG_SOURCE, $"[{buttonName}]が押されました", EventLogEntryType.Information, 110);
 
             // 画面キャプチャの取得
             Capture();
@@ -117,12 +119,12 @@ namespace beartrap {
             }
 
             StringBuilder sb = new StringBuilder();
-            foreach (var item in window_names) { sb.AppendLine(item); }
-            foreach (var item in table_text_lines) { sb.AppendLine(item.ToString()); }
+            foreach (var item in window_names) { sb.AppendLine($"作業中のファイル:{item}"); }
+            foreach (var item in table_text_lines) { sb.AppendLine($"トラック:{item}"); }
             var data = sb.ToString();
             EventLog.WriteEntry(EVENTLEG_SOURCE,
-                $"データの状況は以下の通りです\n{data}",
-                EventLogEntryType.Information, 111);
+                $"[{buttonName}]が押されました\n{data}",
+                EventLogEntryType.Warning, 111);
         }
 
 
@@ -149,7 +151,7 @@ namespace beartrap {
                         InvokePattern.InvokedEvent,
                         cdBurnButton,
                         TreeScope.Element,
-                        HandleInvokeEvent);
+                        new AutomationEventHandler(HandleInvokeEvent));
 
                     EventLog.WriteEntry(EVENTLEG_SOURCE,
                         $"ハンドラを登録しました:{buttonName}",
