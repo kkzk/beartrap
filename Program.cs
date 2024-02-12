@@ -16,23 +16,39 @@ namespace beartrap {
         private static string buttonName;
         private static string EVENTLEG_SOURCE = "beartrap";
         private static AutomationElement DialogElement = null;
+        private static AutomationFocusChangedEventHandler focusHandler = null;
+        private static AutomationEventHandler windowOpenHandler = null;
+        private static int hook_mode;
 
         /// <summary>
         /// アプリケーションのメイン エントリ ポイントです。
         /// </summary>
         [STAThread]
         static void Main() {
+            hook_mode = 1;
             windowName = "音楽CDの作成";
             buttonName = "CD作成(B)";
 
-            // UI Automationのルートオブジェクトを取得
-            AutomationElement rootElement = AutomationElement.RootElement;
+            if (hook_mode == 1) {
+                // フォーカス変更のイベントを監視し、フック対象を見つける
+                focusHandler = new AutomationFocusChangedEventHandler(ForcusChangedHandler);
+                Automation.AddAutomationFocusChangedEventHandler(focusHandler);
+            }
+            else {
+                // ウインドウの作成イベントを監視し、フック対象を見つける
+                //
+                // DigiOnSound Lite を終了してもプロセスが残る事があるので使用しません。
+                // 
 
-            // Window が開くときのイベントを設定
-            Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent,
-                rootElement,
-                TreeScope.Descendants,
-                new AutomationEventHandler(HandleOpenEvent));
+                // UI Automationのルートオブジェクトを取得
+                AutomationElement rootElement = AutomationElement.RootElement;
+
+                // Window が開くときのイベントを設定
+                Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent,
+                    rootElement,
+                    TreeScope.Descendants,
+                    new AutomationEventHandler(HandleOpenEvent));
+            }
 
             EventLog.WriteEntry(EVENTLEG_SOURCE, "イベントハンドラを設定しました", EventLogEntryType.Information, 100);
 
@@ -40,6 +56,30 @@ namespace beartrap {
             Application.SetCompatibleTextRenderingDefault(false);
             Form1 form = new Form1();
             Application.Run();
+            Console.WriteLine("exit");
+            Automation.RemoveAllEventHandlers();
+        }
+
+        // フォーカスが移った時のイベント
+        private static void ForcusChangedHandler(object sender, AutomationEventArgs e) {
+            AutomationElement source  = (AutomationElement)sender;
+
+            // コントロールタイプが Window であるエレメントを上位に向かって探す
+            Condition propCondition = new PropertyCondition(
+                AutomationElement.ControlTypeProperty,
+                ControlType.Window);
+            TreeWalker treeWalker = new TreeWalker(propCondition);
+            var window = treeWalker.GetParent(source);
+
+            if (window != null) {
+                string name = window.Current.Name;
+                Console.WriteLine($"フォーカスのあるウインドウ:{name}");
+
+                if (name == windowName) {
+                    // ウインドウのタイトルが一致したらフックを試みる
+                    SubscriveButtonInvokeEvent(window);
+                }
+            }
         }
 
         static void Capture() {
@@ -64,7 +104,9 @@ namespace beartrap {
             EventLog.WriteEntry(EVENTLEG_SOURCE,
                 $"スクリーンショットを保存しました:{fileName}",
                 EventLogEntryType.Information, 111);
+            Console.WriteLine($"スクリーンショットを保存しました:{fileName}");
         }
+
 
         // UI Automation Invokeイベントハンドラ
         private static void HandleInvokeEvent(object sender, AutomationEventArgs e) {
@@ -139,30 +181,42 @@ namespace beartrap {
                     $"ウインドウが表示されました:{window_title}",
                     EventLogEntryType.Information, 110);
 
-                DialogElement = sourceElement;
-
-                // ウインドウ内の「CD作成」ボタンを取得
-                Condition condition = new PropertyCondition(AutomationElement.NameProperty, buttonName);
-                AutomationElement cdBurnButton = sourceElement.FindFirst(TreeScope.Descendants, condition);
-
-                if (cdBurnButton != null) {
-                    // Invokeイベントハンドラを登録
-                    Automation.AddAutomationEventHandler(
-                        InvokePattern.InvokedEvent,
-                        cdBurnButton,
-                        TreeScope.Element,
-                        new AutomationEventHandler(HandleInvokeEvent));
-
-                    EventLog.WriteEntry(EVENTLEG_SOURCE,
-                        $"ハンドラを登録しました:{buttonName}",
-                        EventLogEntryType.Information, 110);
-                }
-                else {
-                    EventLog.WriteEntry(EVENTLEG_SOURCE,
-                        $"NameProperty が {buttonName} であるコントロールが見つかりませんでした",
-                        EventLogEntryType.Warning, 110);
-                }
+                SubscriveButtonInvokeEvent(sourceElement);
             }
         }
+
+        private static AutomationEventHandler handleInvokeHandler = null;
+        private static void SubscriveButtonInvokeEvent(AutomationElement sourceElement)
+        {
+            DialogElement = sourceElement;
+
+            // ウインドウ内の「CD作成」ボタンを取得
+            Condition condition = new PropertyCondition(AutomationElement.NameProperty, buttonName);
+            AutomationElement cdBurnButton = sourceElement.FindFirst(TreeScope.Descendants, condition);
+
+            if (cdBurnButton != null) {
+                if (handleInvokeHandler != null) {
+                    Automation.RemoveAutomationEventHandler(InvokePattern.InvokedEvent, cdBurnButton, handleInvokeHandler);
+                }
+                // Invokeイベントハンドラを登録
+                Automation.AddAutomationEventHandler(
+                    InvokePattern.InvokedEvent,
+                    cdBurnButton,
+                    TreeScope.Element,
+                    handleInvokeHandler = new AutomationEventHandler(HandleInvokeEvent));
+
+                //EventLog.WriteEntry(EVENTLEG_SOURCE,
+                //    $"ハンドラを登録しました:{buttonName}",
+                //    EventLogEntryType.Information, 110);
+                Console.WriteLine($"ハンドラを登録しました:{buttonName}");
+            } else {
+                //EventLog.WriteEntry(EVENTLEG_SOURCE,
+                //    $"NameProperty が {buttonName} であるコントロールが見つかりませんでした",
+                //    EventLogEntryType.Warning, 110);
+                Console.WriteLine($"NameProperty が {buttonName} であるコントロールが見つかりませんでした");
+            }
+
+        }
+
     }
 }
